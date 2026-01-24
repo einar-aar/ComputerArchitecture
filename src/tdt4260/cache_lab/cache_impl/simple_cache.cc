@@ -91,20 +91,29 @@ SimpleCache::calculateTag(Addr req)
 {
     // TODO: Direct-Mapped: Calculate tag
     // hint: req >> ((int)std::log2(...
-    return req;
+    int tag = req >> ((int)std::log2(blockSize) + (int)std::log2(numSets));
+
+    return tag;
 }
 
 int
 SimpleCache::calculateIndex(Addr req)
 {
     // TODO: Direct-Mapped: Calculate index
-    return 0;
+
+    int index = req >> (int)std::log2(blockSize);
+    index = index & ((1 << (int)std::log2(numSets)) - 1);
+
+    return index;
 }
 
 bool
 SimpleCache::hasLine(int index, int tag)
 {
     // TODO: Direct-Mapped: Check if line is already in cache
+
+    return (int)entries.at(index).at(0)->tag == tag;
+
     // TODO: Associative: Check all possible ways
     return false;
 }
