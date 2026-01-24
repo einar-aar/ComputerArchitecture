@@ -82,6 +82,8 @@ SimpleCache::recvResp(Addr resp)
     DPRINTF(TDTSimpleCache, "Miss: Replaced way: %d\n", way);
     // TODO: Direct-Mapped: Record new cache line in entries
 
+    entries.at(index).at(0)->tag = (Addr)tag;
+
     // TODO: Associative: Record LRU info for new line in entries
     sendResp(resp);
 }
@@ -112,10 +114,10 @@ SimpleCache::hasLine(int index, int tag)
 {
     // TODO: Direct-Mapped: Check if line is already in cache
 
-    return (int)entries.at(index).at(0)->tag == tag;
+    return (int)entries.at(index).at(0)->tag == tag &&
+            entries.at(index).at(0)->tag != MaxAddr;
 
     // TODO: Associative: Check all possible ways
-    return false;
 }
 
 int
