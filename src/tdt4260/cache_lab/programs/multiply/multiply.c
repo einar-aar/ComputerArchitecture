@@ -16,7 +16,7 @@
 #include <unistd.h>
 
 /* Size of the matrices to multiply */
-#define SIZE 200
+#define SIZE 80
 
 /* HINT: The Makefile allows you to specify L1 and L2 block sizes as
  * compile time options.These may be specified when calling make,
@@ -45,12 +45,14 @@ matmul_opt()
          */
         int i, j, k;
 
-                for (k = 0; k < SIZE; k++) {
-        for (j = 0; j < SIZE; j++) {
-            for (i = 0; i < SIZE; i++) {
-                    mat_c[i][j] += mat_a[i][k] * mat_b[k][j];
+        for (j = 0; j < SIZE; j+=8) {
+                for (i = 0; i < SIZE; i++) {
+                        for (k = 0; k < SIZE; k++) {
+                                for (int l = 0; l < 8; l++) {
+                                        mat_c[i][j+l] += mat_a[i][k] * mat_b[k][j+l];
+                                }
+                        }
                 }
-            }
         }
 }
 
