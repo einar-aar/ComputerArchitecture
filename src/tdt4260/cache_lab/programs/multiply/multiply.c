@@ -17,6 +17,7 @@
 
 /* Size of the matrices to multiply */
 #define SIZE 80
+#define SIZE 80
 
 /* HINT: The Makefile allows you to specify L1 and L2 block sizes as
  * compile time options.These may be specified when calling make,
@@ -43,13 +44,14 @@ matmul_opt()
          * here. It should calculate mat_c := mat_a * mat_b. See
          * matmul_ref() for a reference solution.
          */
-        int i, j, k;
+        int j, iteration_size, i, k, l;
 
         for (j = 0; j < SIZE; j+=8) {
+                iteration_size = (j + 8 < SIZE) ? (j + 8) : SIZE;
                 for (i = 0; i < SIZE; i++) {
                         for (k = 0; k < SIZE; k++) {
-                                for (int l = 0; l < 8; l++) {
-                                        mat_c[i][j+l] += mat_a[i][k] * mat_b[k][j+l];
+                                for (l = j; l < iteration_size; l++) {
+                                        mat_c[i][l] += mat_a[i][k] * mat_b[k][l];
                                 }
                         }
                 }
