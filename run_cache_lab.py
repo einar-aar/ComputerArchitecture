@@ -105,9 +105,9 @@ def check_test_associativity_stats(cache_size_bytes, cache_associativity,
 def test_associativity():
     for associativity in [
 # Comment out this line to test all associativities 
-#        1]:
+        #1]:
 # Comment in this line to test all associativities
-       1, 2, 4, 8, 16]:
+        1, 2, 4, 8, 16]:
         for cache_size in [1024, 2048, 4096, 8192, 16384, 32768, 65536]:
             print("---------------- NEW TEST ----------------")
             print(f"Testing for size {cache_size} and associativity {associativity}")

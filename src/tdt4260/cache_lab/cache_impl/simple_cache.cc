@@ -24,8 +24,11 @@ SimpleCache::SimpleCache(int size, int blockSize, int associativity,
 
         // TODO: Associative: Allocate as many entries as there are ways
         // i.e. replace vector of single entry with vector of way number of entries 
-        vec.push_back(new Entry());
+        /*vec.push_back(new Entry());
 
+        entries.push_back(vec);*/
+        for (int i = 0; i < associativity; i++) vec.push_back(new Entry());
+        
         entries.push_back(vec);
     }
 }
@@ -61,6 +64,9 @@ SimpleCache::recvReq(Addr req, int size)
 
         // TODO: Associative: Update LRU info for line in entries
 
+        entries.at(index).at(way)->lastUsed = useCounter;
+        useCounter++;
+
         sendResp(req);
     } else{
         sendReq(req, size);
@@ -82,9 +88,13 @@ SimpleCache::recvResp(Addr resp)
     DPRINTF(TDTSimpleCache, "Miss: Replaced way: %d\n", way);
     // TODO: Direct-Mapped: Record new cache line in entries
 
-    entries.at(index).at(0)->tag = (Addr)tag;
+    // entries.at(index).at(0)->tag = (Addr)tag;
 
     // TODO: Associative: Record LRU info for new line in entries
+    entries.at(index).at(way)->tag = (Addr)tag;
+    entries.at(index).at(way)->lastUsed = useCounter;
+    useCounter++;
+
     sendResp(resp);
 }
 
@@ -114,24 +124,56 @@ SimpleCache::hasLine(int index, int tag)
 {
     // TODO: Direct-Mapped: Check if line is already in cache
 
-    return (int)entries.at(index).at(0)->tag == tag &&
-            entries.at(index).at(0)->tag != MaxAddr;
+    /*return (int)entries.at(index).at(0)->tag == tag &&
+            entries.at(index).at(0)->tag != MaxAddr;*/
 
     // TODO: Associative: Check all possible ways
+
+    for (int i = 0; i < associativity; i++) {
+
+        if ((int)entries.at(index).at(i)->tag == tag
+        && entries.at(index).at(i)->tag != MaxAddr) {
+
+            return true;
+        }
+    }
+    return false;
 }
 
 int
 SimpleCache::lineWay(int index, int tag)
 {
     // TODO: Associative: Find in which way a cache line is stored
-    return 0;
+    int way = 4;
+
+    for (int i = 0; i < associativity; i++) {
+
+        if ((int)entries.at(index).at(i)->tag == tag
+        && entries.at(index).at(i)->tag != MaxAddr) {
+
+            way = i;
+        }
+    }
+    return way;
 }
 
 int
 SimpleCache::oldestWay(int index)
 {
     // TODO: Associative: Determine the oldest way
-    return 0;
+    int oldest_way = 0;
+    int its_since_use = entries.at(index).at(0)->lastUsed;
+
+    for (int i = 1; i < associativity; i++) {
+
+        if (entries.at(index).at(i)->lastUsed < its_since_use) {
+
+            oldest_way = i;
+            its_since_use = entries.at(index).at(i)->lastUsed;
+        }
+    }
+
+    return oldest_way;
 }
 
 void
