@@ -16,7 +16,7 @@
 #include <unistd.h>
 
 /* Size of the matrices to multiply */
-#define SIZE 80
+
 #define SIZE 80
 
 /* HINT: The Makefile allows you to specify L1 and L2 block sizes as
