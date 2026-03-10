@@ -4,6 +4,11 @@
 #include "mem/cache/replacement_policies/base.hh"
 #include "params/TDTPrefetcher.hh"
 
+// Added
+#include <unordered_set>
+#include <deque>
+#include <algorithm>
+
 namespace gem5
 {
 
@@ -19,14 +24,14 @@ namespace {
         1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 15, 16, 18, 20, 24, 25,
         27, 30, 32, 36, 40, 45, 48, 50, 54, 60, 64, 72, 75, 80, 90, 96
 
-    }
+    };
 
     // Current offset index, best offset and learning parameters
     int offsetIndex = 0;
     int bestOffset = 1;
     int round = 0;
     const int maxRound = 100;
-    const int maxScore = 30;
+        const int maxScore = 30;
 
     // Offset scores
     std::vector<int> offsetScores(offsetTable.size(), 0);
@@ -122,14 +127,14 @@ TDTPrefetcher::calculatePrefetch(const PrefetchInfo &pfi,
     int offsetTest = offsetTable[offsetIndex];
 
     // Learning phase
-    if ((int)cacheLine - offsetTest >= 0) {
+    if (cacheLine - (Addr)offsetTest >= 0) {
         Addr recentRequest = cacheLine - offsetTest;
         if (RRTableSet.find(recentRequest) != RRTableSet.end()) offsetScores[offsetIndex]++;
     }
 
-    if (offsetIndex < offsetTable.size()) offsetIndex++;
+    if (offsetIndex < offsetTable.size() - 1) offsetIndex++;
     else {
-        round++:
+        round++;
         offsetIndex = 0;
     }
 
@@ -144,8 +149,7 @@ TDTPrefetcher::calculatePrefetch(const PrefetchInfo &pfi,
             if (offsetScores[highestScoreIndex] < offsetScores[i]) highestScoreIndex = i;
         }
 
-        highestScore = offsetScores[highestScoreIndex];
-
+        bestOffset = offsetTable[highestScoreIndex];
         // Reset learning
         round = 0;
         offsetIndex = 0;
@@ -166,10 +170,12 @@ TDTPrefetcher::calculatePrefetch(const PrefetchInfo &pfi,
     }
 
     // Calculate what line to prefetch based on best offset
-    Addr nextPrefetchedLine = (cacheLine + bestOffset) * blkSize;
+    Addr nextPrefetch = (cacheLine + bestOffset) * blkSize;
 
-    // Prefetch
-    addresses.push_back(AddrPriority(nextPrefetchedLine, 0));
+    // Prefetch only in same page
+    if ((nextPrefetch >> 12) == (access_addr >> 12)) {
+        addresses.push_back(AddrPriority(nextPrefetch, 0));
+    }
 
     // Can safely be ignored
     // Get matching storage of entries
@@ -184,7 +190,7 @@ TDTPrefetcher::calculatePrefetch(const PrefetchInfo &pfi,
     if (entry != nullptr) {
         // There is an entry for this PC
         // You might want to update information for this entry
-        entry->lastAddr = access_addr
+        entry->lastAddr = access_addr;
     } else {
         // No entry for this PC
         // You might want to make an entry for this PC
