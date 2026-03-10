@@ -7,7 +7,7 @@
 // Added
 #include <unordered_set>
 #include <deque>
-#include <algorithm>
+#include <unordered_map>
 
 namespace gem5
 {
@@ -26,21 +26,27 @@ namespace {
 
     };
 
-    // Current offset index, best offset and learning parameters
-    int offsetIndex = 0;
-    int bestOffset = 1;
-    int round = 0;
+    struct PrefetcherLevel{
+
+        // Current offset index, best offset and round
+        int offsetIndex = 0;
+        int bestOffset = 1;
+        int round = 0;
+        
+        // Offset scores
+        std::vector<int> offsetScores;
+        PrefetcherLevel() : offsetScores(offsetTable.size(), 0) {}
+
+        // RR table set for quick lookup during training (unordered set uses hash table)
+        // RR table queue holds the last x accesses
+        std::unordered_set<Addr> RRTableSet;
+        std::deque<Addr> RRTableQueue; 
+    };
+    
+    std::unordered_map<const TDTPrefetcher*, PrefetcherLevel> prefetchers;
+
     const int maxRound = 100;
-        const int maxScore = 30;
-
-    // Offset scores
-    std::vector<int> offsetScores(offsetTable.size(), 0);
-
-    // RR table set, queue and size
-    // RR table set for quick lookup during training (unordered set uses hash table)
-    // RR table queue holds the last x accesses
-    std::unordered_set<Addr> RRTableSet;
-    std::deque<Addr> RRTableQueue;
+    const int maxScore = 30;
     const int RRTableSize = 64;
 }
 
@@ -120,57 +126,61 @@ TDTPrefetcher::calculatePrefetch(const PrefetchInfo &pfi,
     // TODO: Implement something better!
     // addresses.push_back(AddrPriority(access_addr + blkSize, 0));
 
+    // To be able to have different prefetchers for each cache level
+    PrefetcherLevel &prefetcher = prefetchers[this];
+
     // Get cache line location, define highest score, highest score index and get offset to test
     Addr cacheLine = access_addr / blkSize;
     int highestScore = 0;
     int highestScoreIndex = 0;
-    int offsetTest = offsetTable[offsetIndex];
+    int offsetTest = offsetTable[prefetcher.offsetIndex];
 
     // Learning phase
-    if (cacheLine - (Addr)offsetTest >= 0) {
+    if ((Addr)offsetTest <= cacheLine) {
         Addr recentRequest = cacheLine - offsetTest;
-        if (RRTableSet.find(recentRequest) != RRTableSet.end()) offsetScores[offsetIndex]++;
+        if (prefetcher.RRTableSet.find(recentRequest) != prefetcher.RRTableSet.end()) {
+            prefetcher.offsetScores[prefetcher.offsetIndex]++;
+        }
     }
 
-    if (offsetIndex < offsetTable.size() - 1) offsetIndex++;
+    if (prefetcher.offsetIndex < offsetTable.size() - 1) prefetcher.offsetIndex++;
     else {
-        round++;
-        offsetIndex = 0;
+        prefetcher.round++;
+        prefetcher.offsetIndex = 0;
     }
 
-    for (int i : offsetScores) {
+    for (int i : prefetcher.offsetScores) {
         if (highestScore < i) highestScore = i;
     }
 
     // Ending learning phase
-    if (round >= maxRound || highestScore >= maxScore) {
+    if (prefetcher.round >= maxRound || highestScore >= maxScore) {
 
-        for (int i = 1; i < offsetScores.size(); i++) {
-            if (offsetScores[highestScoreIndex] < offsetScores[i]) highestScoreIndex = i;
+        for (int i = 1; i < prefetcher.offsetScores.size(); i++) {
+            if (prefetcher.offsetScores[highestScoreIndex] < prefetcher.offsetScores[i]) highestScoreIndex = i;
         }
 
-        bestOffset = offsetTable[highestScoreIndex];
+        prefetcher.bestOffset = offsetTable[highestScoreIndex];
         // Reset learning
-        round = 0;
-        offsetIndex = 0;
-        for (int i = 0; i < offsetScores.size(); i++) offsetScores[i] = 0;
+        prefetcher.round = 0;
+        prefetcher.offsetIndex = 0;
+        for (int i = 0; i < prefetcher.offsetScores.size(); i++) prefetcher.offsetScores[i] = 0;
     }
 
-    if (RRTableSet.find(cacheLine) == RRTableSet.end()) {
+    if (prefetcher.RRTableSet.find(cacheLine) == prefetcher.RRTableSet.end()) {
 
-        if (RRTableQueue.size() >= RRTableSize) {
+        if (prefetcher.RRTableQueue.size() >= RRTableSize) {
 
-            Addr oldestLine = RRTableQueue.front();
-            RRTableSet.erase(oldestLine);
-            RRTableQueue.pop_front();
+            Addr oldestLine = prefetcher.RRTableQueue.front();
+            prefetcher.RRTableSet.erase(oldestLine);
+            prefetcher.RRTableQueue.pop_front();
         }
-
-        RRTableSet.insert(cacheLine);
-        RRTableQueue.push_back(cacheLine);
+        prefetcher.RRTableSet.insert(cacheLine);
+        prefetcher.RRTableQueue.push_back(cacheLine);
     }
 
     // Calculate what line to prefetch based on best offset
-    Addr nextPrefetch = (cacheLine + bestOffset) * blkSize;
+    Addr nextPrefetch = (cacheLine + prefetcher.bestOffset) * blkSize;
 
     // Prefetch only in same page
     if ((nextPrefetch >> 12) == (access_addr >> 12)) {
