@@ -15,6 +15,11 @@
 #include "mem/packet.hh"
 #include "params/TDTPrefetcherHashedSetAssociative.hh"
 
+// Added
+#include <unordered_set>
+#include <deque>
+#include <algorithm>
+
 namespace gem5
 {
 
